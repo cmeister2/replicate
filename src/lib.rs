@@ -9,7 +9,7 @@
 //! - Run Docker from your original program, mounting the copy as a Docker volume mount
 //! - Run the copied program from within the Dockerized environment.
 //!
-//! Because this library uses [`NamedTempFile`] to generate a temporary location,
+//! Because this library uses [`NamedTempFile`] via [`Builder`] to generate a temporary location,
 //! the following security restrictions apply to [`Replicate`]:
 //!
 //! 1. The copy has a short lifetime and your temporary file cleaner is sane (doesn’t delete recently accessed files).
@@ -31,19 +31,24 @@ use std::os::unix::fs::PermissionsExt;
 use std::{fs::Permissions, ops::Deref, path::Path};
 
 use palaver::env::exe;
+#[cfg(doc)]
+use tempfile::NamedTempFile;
 use tempfile::{Builder, TempPath};
-use thiserror::Error;
-
-/// Possible errors while creating a replicate of the running program
-#[derive(Debug, Error)]
-pub enum ReplicateError {
-    /// A file operation failed while creating the replicate; check
-    /// the associated error for more information.
-    #[error("File operation failed while creating replicate")]
-    IOError(#[from] std::io::Error),
-}
 
 /// A temporary copy of the running executable.
+///
+/// # Example
+///
+/// ```
+/// use replicate::Replicate;
+/// # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+/// let copy = Replicate::new()?;
+///
+/// println!("My copy's path is {}", copy.display());
+///
+/// # Ok(())
+/// # }
+/// ```
 pub struct Replicate {
     path: TempPath,
 }
@@ -51,7 +56,7 @@ pub struct Replicate {
 impl Replicate {
     /// Creates a replicate of the currently running program. The
     /// copy is deleted when this is dropped.
-    pub fn new() -> Result<Self, ReplicateError> {
+    pub fn new() -> Result<Self, std::io::Error> {
         // Use palaver to get a `File` reference to the currently running program.
         let mut self_exe = exe()?;
 
