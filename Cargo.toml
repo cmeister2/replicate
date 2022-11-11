@@ -1,0 +1,19 @@
+[package]
+name = "replicate"
+version = "0.1.0"
+edition = "2021"
+authors = ["Max Dymond <cmeister2@gmail.com>"]
+description = "Copies the currently running program into a temporary location"
+license = "MIT"
+repository = "https://github.com/cmeister2/replicate"
+rust-version = "1.56"
+keywords = ["copy"]
+categories = ["development-tools"]
+
+[dependencies]
+palaver = "0.2.8"
+tempfile = "3.3.0"
+thiserror = "1.0.37"
+
+[dev-dependencies]
+anyhow = "1.0.66"
