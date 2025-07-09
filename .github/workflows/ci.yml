@@ -15,14 +15,22 @@ on:
 name: Continuous integration
 
 jobs:
+  rust_matrix:
+    # Outputs the strategy matrix to be used in other jobs
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.rust.outputs.matrix }}
+    steps:
+      - name: Define rust matrix
+        id: rust
+        run: |
+          echo "matrix={'rust': ['stable', '1.65.0']}" >> $GITHUB_OUTPUT
   check:
     name: Check
     runs-on: ubuntu-latest
+    needs: rust_matrix
     strategy:
-      matrix:
-        rust:
-          - stable
-          - 1.56.0
+      matrix: ${{ fromJson(needs.rust_matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -37,11 +45,9 @@ jobs:
   test:
     name: Test Suite
     runs-on: ubuntu-latest
+    needs: rust_matrix
     strategy:
-      matrix:
-        rust:
-          - stable
-          - 1.56.0
+      matrix: ${{ fromJson(needs.rust_matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -56,11 +62,9 @@ jobs:
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
+    needs: rust_matrix
     strategy:
-      matrix:
-        rust:
-          - stable
-          - 1.56.0
+      matrix: ${{ fromJson(needs.rust_matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -77,11 +81,9 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
+    needs: rust_matrix
     strategy:
-      matrix:
-        rust:
-          - stable
-          - 1.56.0
+      matrix: ${{ fromJson(needs.rust_matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -98,16 +100,12 @@ jobs:
   tarpaulin:
     name: Tarpaulin
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust:
-          - stable
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
           override: true
       - uses: actions-rs/cargo@v1
         with:
@@ -123,20 +121,35 @@ jobs:
           files: ./cobertura.xml
           verbose: true
 
+  msrv:
+    name: Find msrv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-msrv
+      - uses: actions-rs/cargo@v1
+        with:
+          command: msrv
+          args: find
+
   musl:
     name: Musl
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust:
-          - stable
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           target: x86_64-unknown-linux-musl
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
           override: true
       - uses: actions-rs/cargo@v1
         with:
