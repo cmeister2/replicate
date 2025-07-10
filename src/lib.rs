@@ -28,9 +28,12 @@
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-use std::{fs::Permissions, ops::Deref, path::Path};
+use std::{
+    fs::Permissions,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 
-use palaver::env::exe;
 #[cfg(doc)]
 use tempfile::NamedTempFile;
 use tempfile::{Builder, TempDir, TempPath};
@@ -111,6 +114,45 @@ impl Deref for Replicate {
 impl AsRef<Path> for Replicate {
     fn as_ref(&self) -> &Path {
         &self.path
+    }
+}
+
+/// Returns a [File](std::fs::File) of the currently running executable. Akin to `fd::File::open("/proc/self/exe")` on Linux.
+pub fn exe() -> std::io::Result<std::fs::File> {
+    exe_path().and_then(std::fs::File::open)
+}
+
+/// Returns the path of the currently running executable. On Linux this is `/proc/self/exe`.
+// https://stackoverflow.com/questions/1023306/finding-current-executables-path-without-proc-self-exe
+pub fn exe_path() -> std::io::Result<PathBuf> {
+    #[cfg(any(target_os = "android", target_os = "linux"))]
+    {
+        Ok(PathBuf::from("/proc/self/exe"))
+    }
+    #[cfg(any(target_os = "dragonfly"))]
+    {
+        Ok(PathBuf::from("/proc/curproc/file"))
+    }
+    #[cfg(any(target_os = "netbsd"))]
+    {
+        Ok(PathBuf::from("/proc/curproc/exe"))
+    }
+    #[cfg(any(target_os = "solaris"))]
+    {
+        Ok(PathBuf::from(format!(
+            "/proc/{}/path/a.out",
+            nix::unistd::getpid()
+        ))) // or /proc/{}/object/a.out ?
+    }
+    #[cfg(not(any(
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "linux",
+        target_os = "netbsd",
+        target_os = "solaris"
+    )))]
+    {
+        std::env::current_exe()
     }
 }
 
