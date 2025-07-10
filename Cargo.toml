@@ -1,6 +1,6 @@
 [package]
 name = "replicate"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2021"
 authors = ["Max Dymond <cmeister2@gmail.com>"]
 description = "Copies the currently running program into a temporary location"
@@ -11,7 +11,6 @@ keywords = ["copy"]
 categories = ["development-tools"]
 
 [dependencies]
-palaver = "0.2.8"
 tempfile = "3.20.0"
 
 [dev-dependencies]
