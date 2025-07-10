@@ -7,7 +7,8 @@ replicate is a library that:
 - returns a path object to the temporary file, that cleans up the temporary file when dropped.
 
 It's intended to be used by musl-compiled programs which can run inside Docker containers; by
-creating a copy and then volume-mounting that program within the Docker container.
+creating a copy and then volume-mounting that program within the Docker container, or by using
+the program in a named build-context.
 
 # Examples
 

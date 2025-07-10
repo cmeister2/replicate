@@ -87,6 +87,11 @@ jobs:
   musl:
     name: Musl
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        example:
+          - docker
+          - docker_build
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -95,8 +100,10 @@ jobs:
           toolchain: stable
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2.8.0
+        with:
+          key: ${{ matrix.example }}
       - run: |
-          cargo run --example docker --target x86_64-unknown-linux-musl
+          cargo run --example ${{ matrix.example }} --target x86_64-unknown-linux-musl
 
   publish:
     runs-on: ubuntu-latest

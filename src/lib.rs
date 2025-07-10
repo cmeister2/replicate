@@ -30,6 +30,7 @@
 use std::os::unix::fs::PermissionsExt;
 use std::{
     fs::Permissions,
+    io::Write,
     ops::Deref,
     path::{Path, PathBuf},
 };
@@ -37,6 +38,11 @@ use std::{
 #[cfg(doc)]
 use tempfile::NamedTempFile;
 use tempfile::{Builder, TempDir, TempPath};
+
+enum ReplicatePath {
+    TempPath(TempPath),
+    PathBuf(PathBuf),
+}
 
 /// A temporary copy of the running executable.
 ///
@@ -56,16 +62,13 @@ pub struct Replicate {
     /// The parent folder where the copy is stored.
     parent: TempDir,
     /// The full path to the copy of the executable.
-    path: TempPath,
+    path: ReplicatePath,
 }
 
 impl Replicate {
     /// Creates a replicate of the currently running program. The
     /// copy is deleted when this is dropped.
     pub fn new() -> Result<Self, std::io::Error> {
-        // Use palaver to get a `File` reference to the currently running program.
-        let mut self_exe = exe()?;
-
         // Create a temporary directory to hold the copy.
         let parent = tempfile::tempdir()?;
 
@@ -76,20 +79,69 @@ impl Replicate {
             .tempfile_in(parent.path())?;
 
         // Copy the contents of this program into the copy.
-        let _ = std::io::copy(&mut self_exe, &mut copy)?;
+        let _ = Self::copy_self_into_writer(&mut copy)?;
 
         // Convert the copy into a TempPath so we can pass around the path info.
         let path = copy.into_temp_path();
 
-        // If necessary make the copy executable.
+        // Try and make the copy executable.
+        Self::make_executable(&path)?;
+
+        // Return the Replicate.
+        Ok(Self {
+            parent,
+            path: ReplicatePath::TempPath(path),
+        })
+    }
+
+    fn copy_self_into_writer<W: ?Sized + Write>(writer: &mut W) -> std::io::Result<u64> {
+        let mut self_exe = exe()?;
+        std::io::copy(&mut self_exe, writer)
+    }
+
+    fn make_executable<P: AsRef<Path>>(path: P) -> std::io::Result<()> {
         #[cfg(unix)]
         {
             let permissions = Permissions::from_mode(0o755);
-            std::fs::set_permissions(&path, permissions)?;
+            std::fs::set_permissions(path.as_ref(), permissions)
+        }
+        #[cfg(not(unix))]
+        {
+            Ok(())
+        }
+    }
+
+    /// Creates a replicate of the currently running program with the same name.
+    /// The parent directory is cleaned up when this is dropped.
+    pub fn same_name() -> std::io::Result<Self> {
+        let current_exe_path = std::env::current_exe()?;
+
+        let filename = current_exe_path
+            .file_name()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "No file name"))?;
+
+        // Create a temporary directory to hold the copy.
+        let parent = tempfile::tempdir()?;
+
+        // Create a new temporary file in the temporary directory with the same name.
+        let copy_path = parent.path().join(filename);
+
+        {
+            // Open the file for writing.
+            let mut copy = std::fs::File::create(&copy_path)?;
+
+            // Copy the contents of this program into the copy.
+            let _ = Self::copy_self_into_writer(&mut copy)?;
         }
 
+        // Try and make the copy executable.
+        Self::make_executable(&copy_path)?;
+
         // Return the Replicate.
-        Ok(Self { parent, path })
+        Ok(Self {
+            parent,
+            path: ReplicatePath::PathBuf(copy_path),
+        })
     }
 
     /// Returns the parent directory of the copy.
@@ -99,7 +151,10 @@ impl Replicate {
 
     /// Returns the path of the copy.
     pub fn path(&self) -> &Path {
-        self.path.as_ref()
+        match &self.path {
+            ReplicatePath::TempPath(temp_path) => temp_path.as_ref(),
+            ReplicatePath::PathBuf(path_buf) => path_buf.as_ref(),
+        }
     }
 }
 
@@ -107,13 +162,13 @@ impl Deref for Replicate {
     type Target = Path;
 
     fn deref(&self) -> &Path {
-        &self.path
+        self.path()
     }
 }
 
 impl AsRef<Path> for Replicate {
     fn as_ref(&self) -> &Path {
-        &self.path
+        self.path()
     }
 }
 
@@ -174,6 +229,35 @@ mod tests {
 
         // Verify the name starts with "replicate"
         assert!(name.starts_with("replicate"));
+        Ok(())
+    }
+
+    #[test]
+    fn create_replicate_with_same_name() -> anyhow::Result<()> {
+        let copy = Replicate::same_name()?;
+        println!("Created new copy: {}", copy.display());
+
+        let name = copy
+            .file_name()
+            .and_then(OsStr::to_str)
+            .expect("Failed to copy program");
+
+        // Verify the name starts with "replicate"
+        assert!(name.starts_with("replicate"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_that_files_are_cleared_up() -> anyhow::Result<()> {
+        let path_str = {
+            let copy = Replicate::new()?;
+            println!("My copy's path is {}", copy.display());
+            copy.parent().to_path_buf()
+        }; // The copy should be cleaned up here
+
+        // Verify that the temporary directory is deleted
+        assert!(!path_str.exists(), "Temporary directory still exists");
+
         Ok(())
     }
 }
