@@ -129,15 +129,15 @@ pub fn exe_path() -> std::io::Result<PathBuf> {
     {
         Ok(PathBuf::from("/proc/self/exe"))
     }
-    #[cfg(any(target_os = "dragonfly"))]
+    #[cfg(target_os = "dragonfly")]
     {
         Ok(PathBuf::from("/proc/curproc/file"))
     }
-    #[cfg(any(target_os = "netbsd"))]
+    #[cfg(target_os = "netbsd")]
     {
         Ok(PathBuf::from("/proc/curproc/exe"))
     }
-    #[cfg(any(target_os = "solaris"))]
+    #[cfg(target_os = "solaris")]
     {
         Ok(PathBuf::from(format!(
             "/proc/{}/path/a.out",
