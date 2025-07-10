@@ -33,7 +33,7 @@ use std::{fs::Permissions, ops::Deref, path::Path};
 use palaver::env::exe;
 #[cfg(doc)]
 use tempfile::NamedTempFile;
-use tempfile::{Builder, TempPath};
+use tempfile::{Builder, TempDir, TempPath};
 
 /// A temporary copy of the running executable.
 ///
@@ -50,6 +50,9 @@ use tempfile::{Builder, TempPath};
 /// # }
 /// ```
 pub struct Replicate {
+    /// The parent folder where the copy is stored.
+    parent: TempDir,
+    /// The full path to the copy of the executable.
     path: TempPath,
 }
 
@@ -60,11 +63,14 @@ impl Replicate {
         // Use palaver to get a `File` reference to the currently running program.
         let mut self_exe = exe()?;
 
-        // Create a new temporary file.
+        // Create a temporary directory to hold the copy.
+        let parent = tempfile::tempdir()?;
+
+        // Create a new temporary file in the temporary directory.
         let mut copy = Builder::new()
             .prefix("replicate_")
             .rand_bytes(5)
-            .tempfile()?;
+            .tempfile_in(parent.path())?;
 
         // Copy the contents of this program into the copy.
         let _ = std::io::copy(&mut self_exe, &mut copy)?;
@@ -80,7 +86,17 @@ impl Replicate {
         }
 
         // Return the Replicate.
-        Ok(Self { path })
+        Ok(Self { parent, path })
+    }
+
+    /// Returns the parent directory of the copy.
+    pub fn parent(&self) -> &Path {
+        self.parent.path()
+    }
+
+    /// Returns the path of the copy.
+    pub fn path(&self) -> &Path {
+        self.path.as_ref()
     }
 }
 
