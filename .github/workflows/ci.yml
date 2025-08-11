@@ -32,7 +32,7 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.rust_matrix.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
@@ -53,7 +53,7 @@ jobs:
     name: Tarpaulin
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -74,7 +74,7 @@ jobs:
     # Only run on pull requests starting with `renovate/`
     if: startsWith(github.head_ref, 'renovate/')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -93,7 +93,7 @@ jobs:
           - docker
           - docker_build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
           target: x86_64-unknown-linux-musl
@@ -116,7 +116,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: rust-lang/crates-io-auth-action@v1
       id: auth
     - run: cargo publish
