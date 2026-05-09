@@ -1,12 +1,12 @@
 [package]
 name = "replicate"
 version = "0.0.0"
-edition = "2021"
+edition = "2024"
 authors = ["Max Dymond <cmeister2@gmail.com>"]
 description = "Copies the currently running program into a temporary location"
 license = "MIT"
 repository = "https://github.com/cmeister2/replicate"
-rust-version = "1.65"
+rust-version = "1.85"
 keywords = ["copy"]
 categories = ["development-tools"]
 

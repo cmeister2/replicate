@@ -50,7 +50,7 @@ jobs:
       - name: Define rust matrix
         id: rust
         run: |
-          echo "matrix={'rust': ['stable', '1.65.0']}" >> $GITHUB_OUTPUT
+          echo "matrix={'rust': ['stable', '1.85.0']}" >> $GITHUB_OUTPUT
 
   lint-and-test:
     name: Check
