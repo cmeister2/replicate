@@ -1,22 +1,48 @@
-on:
-  push:
-    tags:
-      # Full version
-      - "[0-9]+.[0-9]+.[0-9]+"
-      # Prerelease version
-      - "[0-9]+.[0-9]+.[0-9]+-*"
-
-  pull_request:
-    branches:
-      # Trigger on pull requests into main
-      - main
-    types: [ opened, synchronize ]
-
 name: Continuous integration
 
+'on':
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
+  check-release:
+    name: Check release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      new-release: ${{ steps.release.outputs.new_release }}
+      version: ${{ steps.build-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - run: npm install
+      - name: Release
+        id: release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+      - name: Build version
+        id: build-version
+        run: echo "version=${BUILD_VERSION}" >> "$GITHUB_OUTPUT"
+        env:
+          BUILD_VERSION: ${{ steps.release.outputs.new_release == 'true' && steps.release.outputs.version || format('0.0.{0}', github.run_id) }}
+
   rust_matrix:
-    # Outputs the strategy matrix to be used in other jobs
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.rust.outputs.matrix }}
@@ -24,15 +50,20 @@ jobs:
       - name: Define rust matrix
         id: rust
         run: |
-          echo "matrix={'rust': ['stable', '1.65.0']}" >> $GITHUB_OUTPUT
+          echo "matrix={'rust': ['stable', '1.85.0']}" >> $GITHUB_OUTPUT
+
   lint-and-test:
     name: Check
     runs-on: ubuntu-latest
-    needs: rust_matrix
+    needs:
+      - check-release
+      - rust_matrix
     strategy:
       matrix: ${{ fromJson(needs.rust_matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set version
+        run: python3 prepare.py "${{ needs.check-release.outputs.version }}"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
@@ -40,20 +71,19 @@ jobs:
         uses: Swatinem/rust-cache@v2.8.0
       - run: rustup component add rustfmt
       - run: rustup component add clippy
-      - run: |
-          cargo check
-      - run: |
-          cargo fmt --all -- --check
-      - run: |
-          cargo clippy -- -D warnings
-      - run: |
-          cargo test
+      - run: cargo check
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy -- -D warnings
+      - run: cargo test
 
   tarpaulin:
     name: Tarpaulin
     runs-on: ubuntu-latest
+    needs: [check-release]
     steps:
       - uses: actions/checkout@v4
+      - name: Set version
+        run: python3 prepare.py "${{ needs.check-release.outputs.version }}"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -71,10 +101,12 @@ jobs:
   msrv:
     name: Find msrv
     runs-on: ubuntu-latest
-    # Only run on pull requests starting with `renovate/`
+    needs: [check-release]
     if: startsWith(github.head_ref, 'renovate/')
     steps:
       - uses: actions/checkout@v4
+      - name: Set version
+        run: python3 prepare.py "${{ needs.check-release.outputs.version }}"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -87,6 +119,7 @@ jobs:
   musl:
     name: Musl
     runs-on: ubuntu-latest
+    needs: [check-release]
     strategy:
       matrix:
         example:
@@ -94,6 +127,8 @@ jobs:
           - docker_build
     steps:
       - uses: actions/checkout@v4
+      - name: Set version
+        run: python3 prepare.py "${{ needs.check-release.outputs.version }}"
       - uses: dtolnay/rust-toolchain@master
         with:
           target: x86_64-unknown-linux-musl
@@ -108,17 +143,34 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs:
+      - check-release
       - lint-and-test
       - musl
       - tarpaulin
+      - msrv
+    if: always() && needs.lint-and-test.result == 'success' && needs.musl.result == 'success' && needs.tarpaulin.result == 'success' && (needs.msrv.result == 'success' || needs.msrv.result == 'skipped')
     environment: release
-    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       id-token: write
     steps:
-    - uses: actions/checkout@v4
-    - uses: rust-lang/crates-io-auth-action@v1
-      id: auth
-    - run: cargo publish
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      - uses: actions/checkout@v4
+      - name: Set version
+        run: python3 prepare.py "${{ needs.check-release.outputs.version }}"
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Publish to crates.io
+        run: cargo publish --allow-dirty
+        if: needs.check-release.outputs.new-release == 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      - name: Dry-run publish
+        run: cargo publish --allow-dirty --dry-run
+        if: needs.check-release.outputs.new-release != 'true'
+
+  success:
+    name: Success
+    runs-on: ubuntu-latest
+    needs: [publish]
+    steps:
+      - name: Success
+        run: echo "CI completed successfully!"
