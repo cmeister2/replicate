@@ -68,7 +68,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - name: Rust Cache
-        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       - run: rustup component add rustfmt
       - run: rustup component add clippy
       - run: cargo check
@@ -88,7 +88,7 @@ jobs:
         with:
           toolchain: stable
       - name: Rust Cache
-        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       - run: |
           cargo install cargo-tarpaulin
           cargo tarpaulin --out xml
@@ -111,7 +111,7 @@ jobs:
         with:
           toolchain: stable
       - name: Rust Cache
-        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       - run: |
           cargo install cargo-msrv
           cargo msrv find
@@ -134,7 +134,7 @@ jobs:
           target: x86_64-unknown-linux-musl
           toolchain: stable
       - name: Rust Cache
-        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           key: ${{ matrix.example }}
       - run: |
